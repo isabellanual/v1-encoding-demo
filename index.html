@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>V1 Encoding Model — Natural Scenes Dataset</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        :root {
+            --bg: #0f0f0f;
+            --surface: #1a1a1a;
+            --text: #f0f0f0;
+            --accent: #fd8d3c;
+            --muted: #888888;
+            --glass: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+            --font-main: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: var(--font-main);
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: var(--surface);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: var(--accent);
+            border-radius: 10px;
+        }
+
+        .image-card.selected {
+            border-color: var(--accent);
+            box-shadow: 0 0 15px rgba(253, 141, 60, 0.3);
+            opacity: 1 !important;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #brain-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #333;
+            border-top: 4px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 12px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .stat-card {
+            background: var(--surface);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .stat-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            font-size: 0.65rem;
+            color: var(--muted);
+            margin-top: 4px;
+            line-height: 1.2;
+        }
+
+        #mobile-gallery-strip {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        #mobile-gallery-strip::-webkit-scrollbar {
+            display: none;
+        }
+
+        .panel-container {
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+
+        @media (min-width: 768px) {
+            .desktop-layout {
+                display: grid;
+                grid-template-columns: 280px 1fr 280px;
+                height: calc(100vh - 80px - 60px); /* header - footer */
+                gap: 1px;
+                background: var(--border);
+            }
+            .panel {
+                background: var(--bg);
+                overflow-y: auto;
+            }
+            .viewer-panel {
+                background: radial-gradient(circle at center, #1a1a1a 0%, #0f0f0f 100%);
+            }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+<div id="app" class="hidden flex flex-col h-screen">
+    
+    <!-- Top Header (Desktop & Mobile) -->
+    <header class="h-[80px] px-[30px] border-b border-[var(--border)] flex justify-between items-center bg-[var(--bg)]">
+        <div class="title-group">
+            <h1 class="text-[1.4rem] font-semibold tracking-tight">V1 Encoding Model — Natural Scenes Dataset</h1>
+            <p class="text-[0.85rem] text-[var(--muted)] mt-1">Predicting brain activity in the primary visual cortex from natural images</p>
+        </div>
+        <div class="hidden sm:block text-right">
+            <span class="text-[0.7rem] text-[var(--accent)] font-bold tracking-widest uppercase">Live View</span>
+        </div>
+    </header>
+
+    <!-- Main Content Area: 3-Panel Grid on Desktop -->
+    <div class="desktop-layout flex-1 overflow-hidden">
+        
+        <!-- Panel 1: Image Gallery -->
+        <section class="panel p-6 flex flex-col border-r border-[var(--border)] md:border-r-0">
+            <div class="text-[0.75rem] uppercase tracking-widest text-[var(--accent)] mb-4 font-bold">Image Gallery</div>
+            
+            <!-- Gallery List (Desktop Thumbnails Grid) -->
+            <div id="desktop-gallery-list" class="hidden md:grid grid-cols-2 gap-[10px] overflow-y-auto pr-2 custom-scrollbar">
+                <!-- Populated by script -->
+            </div>
+
+            <!-- Mobile Gallery Strip (Visible on mobile only in this section) -->
+            <div class="md:hidden flex gap-3 overflow-x-auto pb-4 custom-scrollbar" id="mobile-gallery-strip">
+                <!-- Populated by script -->
+            </div>
+            
+            <p class="md:hidden text-[10px] text-[var(--muted)] mt-2 uppercase tracking-tight text-center">Tap an image to see predicted V1 responses</p>
+        </section>
+
+        <!-- Panel 2: 3D Visualization -->
+        <section class="viewer-panel relative bg-[var(--bg)] flex flex-col items-center justify-center p-6">
+            <div id="active-mode-label" class="hidden absolute top-6 px-3 py-1.5 bg-[var(--accent)] text-black text-[0.7rem] font-bold uppercase rounded-full shadow-lg z-20">
+                Predicted V1 Response
+            </div>
+            <div id="default-mode-label" class="absolute top-6 px-3 py-1.5 bg-[var(--surface)] text-[var(--muted)] text-[0.7rem] font-bold uppercase rounded-full border border-[var(--border)] z-20">
+                Correlation Heatmap
+            </div>
+
+            <div class="relative w-full aspect-square max-h-[500px] flex items-center justify-center">
+                <div id="brain-container" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+                <div id="brain-loading">
+                    <div class="spinner"></div>
+                    <p id="loading-status" class="text-xs text-[var(--muted)]">Loading brain mesh…</p>
+                </div>
+            </div>
+
+            <!-- Colorbar (Absolute Bottom of Panel) -->
+            <div class="w-full max-w-[400px] mt-8 flex flex-col gap-2">
+                <div class="h-3 w-full rounded-full bg-gradient-to-r from-[#ffffb2] via-[#fecc5c] via-[#fd8d3c] via-[#f03b20] to-[#bd0026]"></div>
+                <div class="flex justify-between text-[0.7rem] text-[var(--muted)]">
+                    <span id="label-min-r">r = 0.00</span>
+                    <span class="font-bold uppercase tracking-widest text-[10px]">Accuracy Range</span>
+                    <span id="label-max-r">r = 0.67</span>
+                </div>
+            </div>
+
+            <button id="reset-view" class="hidden absolute bottom-6 right-6 px-3 py-1.5 bg-transparent border border-[var(--muted)] text-[var(--muted)] text-[0.75rem] rounded hover:text-white hover:border-white transition-colors">
+                Reset View
+            </button>
+        </section>
+
+        <!-- Panel 3: Stats & Selection Detail -->
+        <section class="panel p-6 overflow-y-auto custom-scrollbar">
+            
+            <!-- Stats Grid (2x2) -->
+            <div class="grid grid-cols-2 gap-3 mb-8">
+                <div class="stat-card">
+                    <div id="stat-mean" class="stat-value">--</div>
+                    <div class="stat-label">Mean accuracy (r)</div>
+                </div>
+                <div class="stat-card">
+                    <div id="stat-max" class="stat-value">--</div>
+                    <div class="stat-label">Max accuracy</div>
+                </div>
+                <div class="stat-card">
+                    <div id="stat-count-02" class="stat-value">--</div>
+                    <div class="stat-label">Voxels r &gt; 0.2</div>
+                </div>
+                <div class="stat-card">
+                    <div id="stat-count-chance" class="stat-value">--</div>
+                    <div class="stat-label">Active Voxels</div>
+                </div>
+            </div>
+
+            <!-- Detail Section -->
+            <div class="border-t border-[var(--border)] pt-6">
+                <div class="text-[0.75rem] uppercase tracking-widest text-[var(--accent)] mb-4 font-bold">Active Selection</div>
+                
+                <div id="desktop-detail">
+                    <div class="text-xs text-[var(--muted)] italic">Select an image from the gallery to explore its specific prediction values.</div>
+                </div>
+                <!-- Mini Histogram Placeholder -->
+                <div id="histogram-section" class="mt-8 hidden">
+                    <div class="mb-2">
+                        <h3 class="text-[0.75rem] uppercase tracking-widest text-[var(--muted)] font-bold">Voxel Distribution</h3>
+                    </div>
+                    <canvas id="histogram-canvas" class="w-full h-[120px] rounded bg-[var(--surface)] p-2"></canvas>
+                    <p id="histogram-caption" class="text-[0.65rem] text-[var(--muted)] mt-2 leading-relaxed">
+                        Predicted (solid) vs Ground Truth (dashed) responses across top voxels.
+                    </p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Bottom Footer (Attribution) -->
+    <footer class="h-[60px] bg-[var(--bg)] border-t border-[var(--border)] flex items-center justify-center px-[30px]">
+        <div class="text-[0.7rem] text-[var(--muted)] text-center leading-relaxed">
+            Data: Natural Scenes Dataset — Allen et al., 2022, Nature Neuroscience<br>
+            Model: ResNet-50 layer1 → Ridge regression (α=100,000), 120 fMRI runs
+        </div>
+    </footer>
+
+    <!-- Mobile-Only detail overlay fallback if needed? Let's just use the 3 columns stacking on mobile -->
+    <div id="mobile-detail" class="hidden"></div>
+</div>
+
+<!-- Scripts Section -->
+<script>
+/**
+ * VEM Neuroscience Demo - Main Logic
+ */
+
+// 1. App State
+const state = {
+    correlations: null,
+    imageResponses: null,
+    vertexToVoxel: null,
+    v1VertexMask: null,
+    selectedImage: null,
+    isActivationMode: false,
+    images: [], // List of image IDs from keys
+    meshes: [], // Binary brain mesh references
+};
+
+// 2. Colormap Logic (YlOrRd)
+function getYlOrRd(t) {
+    // Interpolate between: #ffffb2, #fecc5c, #fd8d3c, #f03b20, #bd0026
+    const colors = [
+        [255, 255, 178], // yl
+        [254, 204, 92],  // light orange
+        [253, 141, 60],  // orange
+        [240, 59, 32],   // red-orange
+        [189, 0, 38]     // red
+    ];
+    
+    t = Math.max(0, Math.min(1, t));
+    const range = (colors.length - 1) * t;
+    const i = Math.floor(range);
+    const j = Math.ceil(range);
+    const fraction = range - i;
+    
+    const c1 = colors[i];
+    const c2 = colors[j];
+    
+    return [
+        (c1[0] + (c2[0] - c1[0]) * fraction) / 255,
+        (c1[1] + (c2[1] - c1[1]) * fraction) / 255,
+        (c1[2] + (c2[2] - c1[2]) * fraction) / 255
+    ];
+}
+
+function getGrey(t = 0.5) {
+    return [t, t, t];
+}
+
+// 3. Three.js Setup
+const brainContainer = document.getElementById('brain-container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0f0f0f);
+
+const camera = new THREE.PerspectiveCamera(35, brainContainer.clientWidth / brainContainer.clientHeight, 0.1, 1000);
+camera.position.set(0, 0, 6);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(brainContainer.clientWidth, brainContainer.clientHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+brainContainer.appendChild(renderer.domElement);
+
+const light1 = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(light1);
+
+const light2 = new THREE.DirectionalLight(0xffffff, 0.8);
+light2.position.set(2, 4, 3);
+scene.add(light2);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.enablePan = false;
+renderer.domElement.style.touchAction = 'none';
+
+function onWindowResize() {
+    camera.aspect = brainContainer.clientWidth / brainContainer.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(brainContainer.clientWidth, brainContainer.clientHeight);
+}
+window.addEventListener('resize', onWindowResize);
+
+// 4. Data Loading
+async function loadData() {
+    try {
+        const loadingStatus = document.getElementById('loading-status');
+        
+        // Parallel fetch
+        const [corrJson, imgRespJson, v2vJson, maskJson] = await Promise.all([
+            fetch('data/correlations.json').then(r => r.json()),
+            fetch('data/image_responses.json').then(r => r.json()),
+            fetch('data/vertex_to_voxel.json').then(r => r.json()),
+            fetch('data/v1_vertex_mask.json').then(r => r.json())
+        ]);
+
+        state.correlations = corrJson;
+        state.imageResponses = imgRespJson;
+        state.vertexToVoxel = v2vJson;
+        state.v1VertexMask = maskJson;
+        state.images = Object.keys(imgRespJson);
+
+        loadingStatus.innerText = 'Loading brain mesh…';
+        
+        const loader = new THREE.GLTFLoader();
+        loader.load('brain_heatmap.glb', (gltf) => {
+            const brainMesh = gltf.scene;
+            scene.add(brainMesh);
+            
+            // Scan for meshes
+            brainMesh.traverse((child) => {
+                if (child.isMesh) {
+                    state.meshes.push(child);
+                    // Force vertex colors
+                    child.geometry.setAttribute('color', 
+                        new THREE.BufferAttribute(new Float32Array(child.geometry.attributes.position.count * 3), 3)
+                    );
+                    child.material.vertexColors = true;
+                }
+            });
+
+            initializeApp();
+        }, 
+        undefined, 
+        (error) => {
+            console.error('GLB Load error:', error);
+            // Fallback: Sphere
+            const sphereGeo = new THREE.SphereGeometry(2, 64, 64);
+            const sphereMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 });
+            const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+            sphere.geometry.setAttribute('color', 
+                new THREE.BufferAttribute(new Float32Array(sphere.geometry.attributes.position.count * 3), 3)
+            );
+            scene.add(sphere);
+            state.meshes.push(sphere);
+            
+            initializeApp();
+        });
+
+    } catch (e) {
+        console.error('Data load error:', e);
+        document.getElementById('loading-status').innerText = 'Error loading data. Check console.';
+        document.getElementById('loading-status').classList.add('text-red-500');
+    }
+}
+
+// 5. App Logic
+function initializeApp() {
+    document.getElementById('brain-loading').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    
+    updateStatsUI();
+    renderHistogram();
+    populateGalleries();
+    updateBrainColors(false); // Mode A
+    
+    animate();
+}
+
+function updateStatsUI() {
+    const c = state.correlations;
+    document.getElementById('stat-mean').innerText = c.mean.toFixed(2);
+    document.getElementById('stat-max').innerText = c.max.toFixed(2);
+    document.getElementById('stat-count-02').innerText = `${(c.n_above_0_2 / 1000).toFixed(1)}k`;
+    document.getElementById('stat-count-chance').innerText = `${(c.n_above_0 / 1000).toFixed(1)}k`;
+    
+    document.getElementById('label-min-r').innerText = `r = ${c.min.toFixed(2)}`;
+    document.getElementById('label-max-r').innerText = `r = ${c.max.toFixed(2)}`;
+}
+
+function renderHistogram() {
+    const canvas = document.getElementById('histogram-canvas');
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const data = state.correlations.histogram;
+    const counts = data.counts;
+    const maxCount = Math.max(...counts);
+    const W = rect.width;
+    const H = rect.height;
+    const pad = 25;
+    const chartW = W - pad * 2;
+    const chartH = H - pad * 2;
+    
+    ctx.clearRect(0, 0, W, H);
+    
+    // Axes
+    ctx.strokeStyle = '#333';
+    ctx.beginPath();
+    ctx.moveTo(pad, pad);
+    ctx.lineTo(pad, H - pad);
+    ctx.lineTo(W - pad, H - pad);
+    ctx.stroke();
+
+    // Bars
+    const barW = chartW / counts.length;
+    counts.forEach((count, i) => {
+        const h = (count / maxCount) * chartH;
+        const x = pad + i * barW;
+        const y = H - pad - h;
+        
+        // Gradient based on x
+        const t = i / counts.length;
+        const [r, g, b] = getYlOrRd(t);
+        ctx.fillStyle = `rgb(${r*255}, ${g*255}, ${b*255})`;
+        ctx.fillRect(x + 1, y, barW - 1, h);
+    });
+
+    // Mean line
+    const mean = state.correlations.mean;
+    const binEdges = data.bin_edges;
+    const minBin = binEdges[0];
+    const maxBin = binEdges[binEdges.length - 1];
+    const meanX = pad + ((mean - minBin) / (maxBin - minBin)) * chartW;
+    
+    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = '#fff';
+    ctx.beginPath();
+    ctx.moveTo(meanX, pad);
+    ctx.lineTo(meanX, H - pad);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    ctx.fillStyle = '#fff';
+    ctx.font = '10px sans-serif';
+    ctx.fillText('mean', meanX + 5, pad + 15);
+    
+    // X axis labels
+    ctx.fillStyle = '#555';
+    ctx.textAlign = 'center';
+    [-0.1, 0, 0.2, 0.4, 0.6].forEach(val => {
+        const x = pad + ((val - minBin) / (maxBin - minBin)) * chartW;
+        if (x >= pad && x <= W - pad) {
+            ctx.fillText(val.toFixed(1), x, H - pad + 15);
+        }
+    });
+}
+
+function populateGalleries() {
+    const desktopList = document.getElementById('desktop-gallery-list');
+    const mobileStrip = document.getElementById('mobile-gallery-strip');
+    
+        state.images.forEach((imgId, idx) => {
+            const rank = idx + 1;
+            const score = state.imageResponses[imgId].image_score;
+            const imgSrc = `images/${imgId}.jpg`;
+            const fallbackSrc = `https://picsum.photos/seed/${imgId}/300/300`;
+            
+        // Desktop Item
+        const dItem = document.createElement('div');
+        dItem.className = 'image-card w-full aspect-square bg-[#1a1a1a] border border-transparent hover:border-[var(--muted)] cursor-pointer relative overflow-hidden group';
+        dItem.dataset.imgId = imgId;
+        dItem.innerHTML = `
+            <img src="${imgSrc}" onerror="this.src='${fallbackSrc}'" alt="${imgId}" class="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity">
+            <div class="absolute top-1 left-1 bg-black/80 text-[10px] px-1.5 py-0.5 rounded text-white">${rank}</div>
+        `;
+        dItem.addEventListener('click', () => selectImage(imgId));
+        desktopList.appendChild(dItem);
+
+        // Mobile Item
+        const mItem = document.createElement('div');
+        mItem.className = 'image-card flex-shrink-0 w-[80px] aspect-square bg-[#1a1a1a] rounded border border-transparent cursor-pointer relative overflow-hidden';
+        mItem.dataset.imgId = imgId;
+        mItem.innerHTML = `
+            <img src="${imgSrc}" onerror="this.src='${fallbackSrc}'" alt="${imgId}" class="w-full h-full object-cover">
+            <div class="absolute top-1 left-1 bg-black/80 text-[10px] px-1 rounded text-white">${rank}</div>
+        `;
+        mItem.addEventListener('click', () => selectImage(imgId));
+        mobileStrip.appendChild(mItem);
+        });
+    }
+
+    function selectImage(imgId) {
+        state.selectedImage = imgId;
+        state.isActivationMode = true;
+        
+        // Update active UI classes
+        document.querySelectorAll('.image-card').forEach(el => {
+            if (el.dataset.imgId === imgId) el.classList.add('selected');
+            else el.classList.remove('selected');
+        });
+
+    // Show labels
+    document.getElementById('reset-view').classList.remove('hidden');
+    document.getElementById('active-mode-label').classList.remove('hidden');
+    document.getElementById('default-mode-label').classList.add('hidden');
+    document.getElementById('histogram-section').classList.remove('hidden');
+    
+    updateBrainColors(true);
+    renderDetailView();
+    
+    // Smooth scroll for mobile
+    if (window.innerWidth < 768) {
+        document.getElementById('histogram-section').scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+function resetToCorrelation() {
+    state.isActivationMode = false;
+    state.selectedImage = null;
+    
+    document.querySelectorAll('.image-card').forEach(el => el.classList.remove('selected'));
+    document.getElementById('reset-view').classList.add('hidden');
+    document.getElementById('active-mode-label').classList.add('hidden');
+    document.getElementById('default-mode-label').classList.remove('hidden');
+    document.getElementById('histogram-section').classList.add('hidden');
+    
+    updateBrainColors(false);
+    
+    // Clear detail
+    document.getElementById('desktop-detail').innerHTML = `<div class="text-xs text-[var(--muted)] italic">Select an image from the gallery to explore its specific prediction values.</div>`;
+}
+
+    document.getElementById('reset-view').addEventListener('click', resetToCorrelation);
+
+    function renderDetailView() {
+        if (!state.selectedImage) return;
+        
+        const imgData = state.imageResponses[state.selectedImage];
+        const imgSrc = `images/${state.selectedImage}.jpg`;
+        const fallbackSrc = `https://picsum.photos/seed/${state.selectedImage}/300/300`;
+
+        const content = `
+            <div class="flex flex-col gap-4">
+                <div class="w-full aspect-square bg-[var(--surface)] overflow-hidden rounded border border-[var(--border)]">
+                    <img src="${imgSrc}" onerror="this.src='${fallbackSrc}'" alt="${state.selectedImage}" class="w-full h-full object-cover">
+                </div>
+                <div class="flex justify-between items-center">
+                    <h2 class="text-sm font-bold text-white uppercase tracking-wider">${state.selectedImage}</h2>
+                    <div class="text-xs text-[var(--accent)] font-bold">Score: ${imgData.image_score.toFixed(2)}</div>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('desktop-detail').innerHTML = content;
+        
+        // Render chart in next tick
+        setTimeout(() => renderMiniChart(), 0);
+    }
+
+function renderMiniChart() {
+    const canvas = document.getElementById('histogram-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const imgData = state.imageResponses[state.selectedImage];
+    const pred = imgData.predicted;
+    const truth = imgData.ground_truth;
+    
+    // Sample top 20 voxels by ground truth magnitude
+    const indices = Array.from({length: pred.length}, (_, i) => i)
+        .sort((a, b) => Math.abs(truth[b]) - Math.abs(truth[a]))
+        .slice(0, 20);
+
+    const W = rect.width;
+    const H = rect.height;
+    const pad = 25;
+    const chartH = H - pad * 2;
+    const barW = (W - pad * 2) / 20;
+    
+    // Find min/max for scale
+    const allVals = [...pred, ...truth];
+    const minVal = Math.min(0, ...allVals);
+    const maxVal = Math.max(...allVals);
+    const range = maxVal - minVal;
+    
+    const getY = (val) => H - pad - ((val - minVal) / range) * chartH;
+    const zeroY = getY(0);
+
+    ctx.clearRect(0, 0, W, H);
+    
+    // Draw grid
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad, zeroY);
+    ctx.lineTo(W - pad, zeroY);
+    ctx.stroke();
+
+    indices.forEach((idx, i) => {
+        const x = pad + i * barW + 2;
+        const pVal = pred[idx];
+        const tVal = truth[idx];
+        
+        const py = getY(pVal);
+        const ty = getY(tVal);
+        
+        // Prediction: Orange fill
+        ctx.fillStyle = '#fd8d3c';
+        ctx.fillRect(x, Math.min(zeroY, py), barW - 4, Math.abs(py - zeroY));
+        
+        // Ground Truth: Outline
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, Math.min(zeroY, ty), barW - 4, Math.abs(ty - zeroY));
+    });
+    
+    // Axis labels
+    ctx.fillStyle = '#666';
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('z-score', pad + 40, 10);
+    ctx.textAlign = 'center';
+    ctx.fillText('Top 20 voxels by activation', W / 2, H - 5);
+}
+
+// 6. Brain Animator
+let animationStartTime = 0;
+let isAnimatingColors = false;
+let colorTarget = []; // array of [r,g,b]
+let colorSource = [];
+
+function updateBrainColors(isModeB) {
+    if (!state.meshes.length) return;
+    
+    const v2v = state.vertexToVoxel.vertex_to_voxel;
+    const mask = state.vertexToVoxel.close_mask;
+    
+    const targetColors = [];
+    
+    if (!isModeB) {
+        // Mode A: Correlations
+        const corrs = state.correlations.correlations;
+        const maxR = state.correlations.max;
+        
+        for (let i = 0; i < v2v.length; i++) {
+            if (!mask[i]) {
+                targetColors.push(getGrey(0.3));
+            } else {
+                const voxelIdx = v2v[i];
+                const rVal = corrs[voxelIdx];
+                if (rVal === null || isNaN(rVal)) {
+                    targetColors.push(getGrey(0.1));
+                } else {
+                    targetColors.push(getYlOrRd(rVal / maxR));
+                }
+            }
+        }
+    } else {
+        // Mode B: Image Activation
+        const pred = state.imageResponses[state.selectedImage].predicted;
+        const minP = Math.min(...pred);
+        const maxP = Math.max(...pred);
+        const pRange = maxP - minP || 1;
+        
+        for (let i = 0; i < v2v.length; i++) {
+            if (!mask[i]) {
+                targetColors.push(getGrey(0.3));
+            } else {
+                const voxelIdx = v2v[i];
+                const pVal = pred[voxelIdx];
+                targetColors.push(getYlOrRd((pVal - minP) / pRange));
+            }
+        }
+    }
+
+    // Capture source and prepare animation
+    captureCurrentColors();
+    colorTarget = targetColors;
+    animationStartTime = performance.now();
+    isAnimatingColors = true;
+}
+
+function captureCurrentColors() {
+    colorSource = [];
+    if (!state.meshes.length) return;
+    const mesh = state.meshes[0];
+    const colors = mesh.geometry.attributes.color.array;
+    for (let i = 0; i < colors.length; i += 3) {
+        colorSource.push([colors[i], colors[i+1], colors[i+2]]);
+    }
+}
+
+function lerpColors(timestamp) {
+    if (!isAnimatingColors) return;
+    
+    const duration = 400;
+    const elapsed = timestamp - animationStartTime;
+    const t = Math.min(1, elapsed / duration);
+    
+    // Easing (standard ease-out)
+    const et = 1 - Math.pow(1 - t, 3);
+    
+    state.meshes.forEach(mesh => {
+        const colors = mesh.geometry.attributes.color.array;
+        for (let i = 0; i < colorTarget.length; i++) {
+            const sc = colorSource[i] || [0.5, 0.5, 0.5];
+            const tc = colorTarget[i];
+            
+            const r = sc[0] + (tc[0] - sc[0]) * et;
+            const g = sc[1] + (tc[1] - sc[1]) * et;
+            const b = sc[2] + (tc[2] - sc[2]) * et;
+            
+            // Map to all vertex indices for this logical vertex if needed, 
+            // but here we assume a 1:1 map for simplicity or we repeat
+            // Actually, glf meshes might have reindexed vertices.
+            // For this demo, we apply to current buffer
+            const idx = i * 3;
+            if (idx < colors.length) {
+                colors[idx] = r;
+                colors[idx+1] = g;
+                colors[idx+2] = b;
+            }
+        }
+        mesh.geometry.attributes.color.needsUpdate = true;
+    });
+    
+    if (t >= 1) {
+        isAnimatingColors = false;
+    }
+}
+
+function animate(time) {
+    requestAnimationFrame(animate);
+    controls.update();
+    lerpColors(performance.now());
+    renderer.render(scene, camera);
+}
+
+// 7. Start the engine
+loadData();
+</script>
+
+</body>
+</html>
+
