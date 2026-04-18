@@ -338,7 +338,7 @@ function getGrey(t = 0.5) {
 // 3. Three.js Setup
 const brainContainer = document.getElementById('brain-container');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1a2535);  // dark blue-grey, distinct from brain mesh
+scene.background = new THREE.Color(0x0f0f0f);
 
 const camera = new THREE.PerspectiveCamera(35, brainContainer.clientWidth / brainContainer.clientHeight, 0.1, 2000);
 camera.position.set(-30, 80, 380);  // pulled further back, tilted to look down at occipital
@@ -403,16 +403,9 @@ async function loadData() {
                     );
                     child.material = child.material.clone();
                     child.material.vertexColors = true;
-                    child.material.transparent = true;
-                    // first mesh in scene = transparent shell (rest of brain)
-                    if (state.meshes.length === 1) {
-                        child.material.opacity = 0.15;
-                        child.material.depthWrite = false;  // critical — prevents shell occluding V1
-                    } else {
-                        // second mesh = V1, solid
-                        child.material.opacity = 0.95;
-                        child.material.depthWrite = true;
-                    }
+                    child.material.transparent = false;
+                    child.material.depthWrite = true;
+                    child.material.opacity = 1.0;
                 }
             });
 
