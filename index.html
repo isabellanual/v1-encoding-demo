@@ -257,7 +257,7 @@
                 <div>
                     <h2 class="text-white font-bold text-sm mb-1">What am I looking at?</h2>
                     <p class="text-[var(--muted)] text-xs leading-relaxed">
-                        This model predicts brain activity inthe primary visual cortex  <span class="text-white font-semibold">(V1)</span>in response to natural images.
+                        This model predicts brain activity in the primary visual cortex <span class="text-white font-semibold">(V1)</span> in response to natural images.
                     </p>
                 </div>
             </div>
@@ -265,7 +265,7 @@
                 <div class="w-3 h-3 rounded-full bg-[#fd8d3c] mt-1 flex-shrink-0"></div>
                 <div>
                     <p class="text-[var(--muted)] text-xs leading-relaxed">
-                        The <span class="text-white font-semibold">colored region</span> on the brain is V1. Warmer colors = stronger BOLD response. The gray brain is shown for context only, the model does not predict anywhere else.
+                        The <span class="text-white font-semibold">colored region</span> on the brain is V1. Warmer colors = stronger BOLD response. The grey brain is shown for context only, the model does not predict anywhere else.
                     </p>
                 </div>
             </div>
@@ -345,9 +345,6 @@ renderer.setSize(brainContainer.clientWidth, brainContainer.clientHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 brainContainer.appendChild(renderer.domElement);
 
-const light1 = new THREE.AmbientLight(0xffffff, 2.0);
-scene.add(light1);
-
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.enablePan = false;
@@ -392,14 +389,10 @@ async function loadData() {
                     state.meshes.push(child);
                     child.geometry.setAttribute('color',
                         new THREE.BufferAttribute(
-                            new Float32Array(child.geometry.attributes.position.count * 3), 3)
-                    );
-                    child.material = child.material.clone();
-                    child.material.vertexColors = true;
-                    child.material.transparent = false;
-                    child.material.depthWrite = true;
-                    child.material.opacity = 1.0;
+                            new Float32Array(child.geometry.attributes.position.count * 3), 3));
+                child.material = new THREE.MeshBasicMaterial({ vertexColors: true });
                 }
+            }
             });
 
             initializeApp();
