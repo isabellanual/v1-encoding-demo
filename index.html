@@ -350,36 +350,12 @@ controls.enableDamping = true;
 controls.enablePan = false;
 renderer.domElement.style.touchAction = 'none';
 
-// Lighting — low ambient base so grooves stay visible as shadows,
-// plus six directional lights spread around the brain so no face
-// goes fully dark when the user rotates to the occipital region
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
-scene.add(ambientLight);
+const light1 = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(light1);
 
-// Front-top-right (original key light position)
-const lightA = new THREE.DirectionalLight(0xffffff, 0.7);
-lightA.position.set(2, 4, 3);
-scene.add(lightA);
-
-// Rear (illuminates occipital / V1)
-const lightB = new THREE.DirectionalLight(0xffffff, 0.7);
-lightB.position.set(-2, 4, -4);
-scene.add(lightB);
-
-// Left fill
-const lightC = new THREE.DirectionalLight(0xffffff, 0.35);
-lightC.position.set(-4, 0, 0);
-scene.add(lightC);
-
-// Right fill
-const lightD = new THREE.DirectionalLight(0xffffff, 0.35);
-lightD.position.set(4, 0, 0);
-scene.add(lightD);
-
-// Bottom fill — prevents underside going completely black
-const lightE = new THREE.DirectionalLight(0xffffff, 0.25);
-lightE.position.set(0, -4, 0);
-scene.add(lightE);
+const light2 = new THREE.DirectionalLight(0xffffff, 0.8);
+light2.position.set(2, 4, 3);
+scene.add(light2);
 
 function onWindowResize() {
     camera.aspect = brainContainer.clientWidth / brainContainer.clientHeight;
