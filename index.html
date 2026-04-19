@@ -345,14 +345,8 @@ renderer.setSize(brainContainer.clientWidth, brainContainer.clientHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 brainContainer.appendChild(renderer.domElement);
 
-const light1 = new THREE.AmbientLight(0xffffff, 0.8);
+const light1 = new THREE.AmbientLight(0xffffff, 1.8);
 scene.add(light1);
-    
-const light2 = new THREE.DirectionalLight(0xffffff, 0.8);
-light2.position.set(5, -5, -7);
-light2.intensity = 1.4;
-light2.castShadow = false;
-scene.add(light2);
 
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
