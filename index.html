@@ -134,7 +134,7 @@
     <!-- Top Header (Desktop & Mobile) -->
     <header class="hidden md:flex h-[80px] px-[30px] border-b border-[var(--border)] justify-between items-center bg-[var(--bg)]">
         <div class="title-group">
-            <h1 class="text-[1.4rem] font-semibold tracking-tight">V1 Encoding Model — Natural Scenes Dataset</h1>
+            <h1 class="text-[1.4rem] font-semibold tracking-tight">V1 Encoding Model with Natural Scenes Dataset</h1>
             <p class="text-[0.85rem] text-[var(--muted)] mt-1">Predicting brain activity in the primary visual cortex from natural images</p>
         </div>
         <div class="hidden sm:block text-right">
@@ -185,7 +185,7 @@
                     <span id="label-max-r">r = 0.67</span>
                 </div>
                 <p id="colorbar-caption" class="text-[0.65rem] text-[var(--muted)] text-center leading-relaxed mt-1">
-                    Color represents the measured BOLD signal in V1 — gray regions are outside the model's scope.
+                    Color represents the measured BOLD signal in V1. Grey regions are outside the model's scope.
                 </p>
             </div>
 
@@ -241,7 +241,7 @@
     <!-- Bottom Footer (Attribution) -->
     <footer class="h-[60px] bg-[var(--bg)] border-t border-[var(--border)] flex items-center justify-center px-[30px]">
         <div class="text-[0.7rem] text-[var(--muted)] text-center leading-relaxed">
-            Data: Natural Scenes Dataset — Allen et al., 2022, Nature Neuroscience<br>
+            Data: Natural Scenes Dataset- Allen et al., 2022, Nature Neuroscience<br>
             Model: ResNet-50 layer1 → Ridge regression (α=100,000), 120 fMRI runs
         </div>
     </footer>
@@ -257,7 +257,7 @@
                 <div>
                     <h2 class="text-white font-bold text-sm mb-1">What am I looking at?</h2>
                     <p class="text-[var(--muted)] text-xs leading-relaxed">
-                        This model predicts brain activity in <span class="text-white font-semibold">V1</span> — the primary visual cortex — in response to natural images.
+                        This model predicts brain activity inthe primary visual cortex  <span class="text-white font-semibold">(V1)</span>in response to natural images.
                     </p>
                 </div>
             </div>
@@ -265,7 +265,7 @@
                 <div class="w-3 h-3 rounded-full bg-[#fd8d3c] mt-1 flex-shrink-0"></div>
                 <div>
                     <p class="text-[var(--muted)] text-xs leading-relaxed">
-                        The <span class="text-white font-semibold">colored region</span> on the brain is V1. Warmer colors = stronger BOLD response. The gray brain is shown for context only — the model does not predict anywhere else.
+                        The <span class="text-white font-semibold">colored region</span> on the brain is V1. Warmer colors = stronger BOLD response. The gray brain is shown for context only, the model does not predict anywhere else.
                     </p>
                 </div>
             </div>
@@ -278,7 +278,7 @@
                 </div>
             </div>
             <button id="dismiss-tooltip" class="w-full py-3 rounded-xl text-sm font-bold text-white" style="background: var(--accent);">
-                Got it — explore the model
+                Got it - explore the model
             </button>
         </div>
     </div>
